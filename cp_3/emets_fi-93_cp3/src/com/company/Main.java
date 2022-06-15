@@ -64,7 +64,9 @@ public class Main {
 
                             String openText = decrypt(fileContent, res, b);
 
-                            System.out.printf("(%s:%s) \n", res, b);
+                            double index = calculateIndex(openText);
+
+                            System.out.printf("(%s:%s) index - %s\n", res, b, index);
                         }
                     }
 
@@ -72,6 +74,21 @@ public class Main {
             }
         }
 
+    }
+
+    public static double calculateIndex(String cipherText) {
+        HashMap<Character, Integer> map = new HashMap<>();
+        double res = 0;
+        for (int i = 0; i < cipherText.length(); i++) {
+            Character character = cipherText.charAt(i);
+            map.merge(character, 1, Integer::sum);
+        }
+
+        for (Character key : map.keySet()) {
+            res += map.get(key) * (map.get(key) - 1);
+        }
+
+        return res * (1 / (double) ((cipherText.length()) * (cipherText.length() - 1)));
     }
 
     private static List<Integer> equationSolver(int a, int b, int n) {
