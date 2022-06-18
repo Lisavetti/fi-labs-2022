@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -22,6 +24,15 @@ public class Main {
     private static final Set<String> KEYS = Set.of(
             "ор", "лес", "нога", "крыса", "последовательность"
     );
+
+    private static final double[] RUSSIAN_LETTER_FREQUENCES = new double[] {
+            0.0801d, 0.0159d, 0.0454d, 0.0170d, 0.0298d, 0.0845d,
+            0.0094d, 0.0165d, 0.0735d, 0.0121d, 0.0349d, 0.0121d,
+            0.0349d, 0.0440d, 0.0321d, 0.0670d, 0.1097d, 0.0281d,
+            0.0473d, 0.0547d, 0.0626d, 0.0262d, 0.0026d, 0.0097d,
+            0.0048d, 0.0144d, 0.0073d, 0.0036d, 0.0004d, 0.0190d,
+            0.0174d, 0.0032d, 0.0064d, 0.0201d
+    };
 
     public static void main(String[] args) {
         String openText = readFile("src/com/company/clearText.txt");
@@ -42,12 +53,60 @@ public class Main {
 
         for (int i = 1; i <= 14; i++) {
             String period = calculateY(cipheredText, i);
-            Map.Entry<Character, Integer> entry = calculateFrequency(period);
+            Map.Entry<Character, Integer> entry = calculateFrequency(period, true);
             System.out.printf("Period %s most popular letter %s frequency is %s possible letters is %s\n", i, entry.getKey(), entry.getValue(), poossibleLetters(entry.getKey()));
         }
+        String calculateMi = calculateMi(14, cipheredText);
 
+        String miKey = "экмкаятникфско";
         String foundKey = "экомаятникфуко";
         decryptContentWithKnownKey(cipheredText, foundKey);
+    }
+
+    private static final String calculateMi(int probableKeyLength, String cipheredText) {
+        HashMap<Character, List<Double>> commonLetterMatrice = new LinkedHashMap<>();
+        StringBuilder possibleKey = new StringBuilder();
+        for (int i = 0; i < probableKeyLength; i++) {
+            StringBuilder blockOfText = new StringBuilder();
+            for (int j = i; j < cipheredText.length(); j = probableKeyLength + j) {
+                blockOfText.append(cipheredText.charAt(j));
+            }
+            HashMap<Character, Integer> letterFrequenciesMap = calculateFrequency(blockOfText.toString(), false);
+            HashMap<Character, Double> letterMatrice = new LinkedHashMap<>();
+            for (int k = 0; k < RUSSIAN_ALPHABET.length; k++) {
+                double sum = 0.0d;
+                for (int j = 0; j < RUSSIAN_ALPHABET.length; j++) {
+                    char alphabetChar = RUSSIAN_ALPHABET[(j + k) % 32];
+                    int letterFrequencies = letterFrequenciesMap.getOrDefault(alphabetChar, 0);
+                    double theoreticalLetterFrequency = RUSSIAN_LETTER_FREQUENCES[j];
+                    sum += letterFrequencies * theoreticalLetterFrequency;
+                }
+                letterMatrice.put(RUSSIAN_ALPHABET[k], sum);
+
+            }
+            Character key = letterMatrice.entrySet()
+                    .stream()
+                    .max((entry1, entry2) -> entry1.getValue() > entry2.getValue() ? 1 : -1)
+                    .orElseThrow()
+                    .getKey();
+
+            possibleKey.append(key);
+
+            for (Character ch : letterMatrice.keySet()) {
+                if (commonLetterMatrice.containsKey(ch)) {
+                    List<Double> doubles = commonLetterMatrice.get(ch);
+                    double doubleValue = BigDecimal.valueOf(letterMatrice.get(ch)).setScale(2, RoundingMode.HALF_UP).doubleValue();
+                    doubles.add(doubleValue);
+                } else {
+                    List<Double> doubles = new ArrayList<>();
+                    double value = BigDecimal.valueOf(letterMatrice.get(ch)).setScale(2, RoundingMode.HALF_UP).doubleValue();
+                    doubles.add(value);
+                    commonLetterMatrice.put(ch, doubles);
+                }
+            }
+        }
+
+        return possibleKey.toString();
     }
 
     public static List<Character> poossibleLetters(Character letter) {
@@ -142,20 +201,23 @@ public class Main {
 
     public static String calculateY(String cipherText, int per) {
         StringBuilder content = new StringBuilder();
-        for (int i = per; i < cipherText.length() - 1; i += per) {
+        for (int i = per; i < cipherText.length(); i = i + per) {
             content.append(cipherText.charAt(i));
         }
         return content.toString();
     }
 
-    public static Map.Entry<Character, Integer> calculateFrequency(String content) {
+    public static HashMap<Character, Integer> calculateFrequency(String content, boolean needSort) {
         HashMap<Character, Integer> map = new HashMap<>();
         for (int i = 0; i < content.length(); i++) {
             Character character = content.charAt(i);
             map.merge(character, 1, Integer::sum);
         }
-        map = sortByComparator(map, false);
-        return map.entrySet().iterator().next();
+        if (!needSort) {
+            return map;
+        } else {
+            return sortByComparator(map, false);
+        }
     }
 
     private static HashMap<Character, Integer> sortByComparator(Map<Character, Integer> unsortMap, final boolean order) {
